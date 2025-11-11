@@ -1,0 +1,16 @@
+16:52:51 **** Build of configuration Debug for project adc ****
+make -j12 all 
+arm-none-eabi-gcc -o "adc.elf" @"objects.list"   -mcpu=cortex-m3 -T"D:\workspace_1.15.0\adc\STM32F103C8TX_FLASH.ld" --specs=nosys.specs -Wl,-Map="adc.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: adc.elf
+ 
+arm-none-eabi-size  adc.elf 
+arm-none-eabi-objdump -h -S adc.elf  > "adc.list"
+   text	   data	    bss	    dec	    hex	filename
+   7840	     12	   1708	   9560	   2558	adc.elf
+Finished building: default.size.stdout
+ 
+Finished building: adc.list
+ 
+
+16:52:52 Build Finished. 0 errors, 0 warnings. (took 496ms)
+

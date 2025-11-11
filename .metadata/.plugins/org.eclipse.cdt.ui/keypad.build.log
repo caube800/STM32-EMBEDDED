@@ -1,0 +1,10 @@
+15:26:20 **** Build of configuration Debug for project keypad ****
+make -j12 all 
+arm-none-eabi-size  keypad.elf 
+   text	   data	    bss	    dec	    hex	filename
+   5184	     12	   1572	   6768	   1a70	keypad.elf
+Finished building: default.size.stdout
+ 
+
+15:26:21 Build Finished. 0 errors, 0 warnings. (took 344ms)
+

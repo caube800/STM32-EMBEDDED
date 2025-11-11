@@ -1,0 +1,10 @@
+15:26:21 **** Build of configuration Debug for project led_rgb ****
+make -j12 all 
+arm-none-eabi-size  led_rgb.elf 
+   text	   data	    bss	    dec	    hex	filename
+   4700	     12	   1572	   6284	   188c	led_rgb.elf
+Finished building: default.size.stdout
+ 
+
+15:26:21 Build Finished. 0 errors, 0 warnings. (took 339ms)
+

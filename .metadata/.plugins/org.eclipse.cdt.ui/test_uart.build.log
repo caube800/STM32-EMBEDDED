@@ -1,0 +1,10 @@
+16:52:53 **** Build of configuration Debug for project test_uart ****
+make -j12 all 
+arm-none-eabi-size  test_uart.elf 
+   text	   data	    bss	    dec	    hex	filename
+   8360	     12	   1652	  10024	   2728	test_uart.elf
+Finished building: default.size.stdout
+ 
+
+16:52:54 Build Finished. 0 errors, 0 warnings. (took 241ms)
+

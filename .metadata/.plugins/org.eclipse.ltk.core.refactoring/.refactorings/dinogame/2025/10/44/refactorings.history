@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Rename resource &apos;dinogame/Core/Inc/TrexGame&apos; to &apos;TrexGame.h&apos;" description="Rename resource &apos;TrexGame&apos;" flags="7" id="org.eclipse.ltk.core.refactoring.rename.resource" input="Core/Inc/TrexGame" name="TrexGame.h" stamp="1761727116797" updateReferences="true"/>
+</session>

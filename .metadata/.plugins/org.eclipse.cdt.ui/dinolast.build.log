@@ -1,0 +1,10 @@
+17:21:42 **** Incremental Build of configuration Debug for project dinolast ****
+make -j12 all 
+arm-none-eabi-size  dinolast.elf 
+   text	   data	    bss	    dec	    hex	filename
+  25164	    156	   3052	  28372	   6ed4	dinolast.elf
+Finished building: default.size.stdout
+ 
+
+17:21:42 Build Finished. 0 errors, 0 warnings. (took 296ms)
+

@@ -1,0 +1,10 @@
+23:59:28 **** Incremental Build of configuration Debug for project uart_ring_buffer ****
+make -j12 all 
+arm-none-eabi-size  uart_ring_buffer.elf 
+   text	   data	    bss	    dec	    hex	filename
+   5884	     12	   1796	   7692	   1e0c	uart_ring_buffer.elf
+Finished building: default.size.stdout
+ 
+
+23:59:28 Build Finished. 0 errors, 0 warnings. (took 245ms)
+

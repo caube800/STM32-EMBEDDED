@@ -1,0 +1,12 @@
+../Core/Src/soft_i2c.c:3:13:I2C_Delay	16	static
+../Core/Src/soft_i2c.c:7:13:SDA_High	8	static
+../Core/Src/soft_i2c.c:10:13:SDA_Low	8	static
+../Core/Src/soft_i2c.c:13:13:SCL_High	8	static
+../Core/Src/soft_i2c.c:17:13:SCL_Low	8	static
+../Core/Src/soft_i2c.c:23:6:SoftI2C_Init	32	static
+../Core/Src/soft_i2c.c:37:6:SoftI2C_Start	8	static
+../Core/Src/soft_i2c.c:43:6:SoftI2C_Stop	8	static
+../Core/Src/soft_i2c.c:48:16:SoftI2C_WriteBit	16	static
+../Core/Src/soft_i2c.c:55:16:SoftI2C_ReadBit	32	static
+../Core/Src/soft_i2c.c:75:9:SoftI2C_WriteByte	24	static
+../Core/Src/soft_i2c.c:83:9:SoftI2C_ReadByte	24	static

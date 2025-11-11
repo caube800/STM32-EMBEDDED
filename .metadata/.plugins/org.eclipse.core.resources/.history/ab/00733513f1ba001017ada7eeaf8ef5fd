@@ -1,0 +1,945 @@
+/* USER CODE BEGIN Header */
+/**
+  ******************************************************************************
+  * @file           : main.c
+  * @brief          : Main program body
+  ******************************************************************************
+  * @attention
+  *
+  * Copyright (c) 2025 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
+  */
+/* USER CODE END Header */
+/* Includes ------------------------------------------------------------------*/
+#include "main.h"
+
+/* Private includes ----------------------------------------------------------*/
+/* USER CODE BEGIN Includes */
+#include "ssd1306.h"
+#include "ssd1306_fonts.h"
+#include "soft_i2c.h"
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdbool.h>
+/* USER CODE END Includes */
+
+/* Private typedef -----------------------------------------------------------*/
+/* USER CODE BEGIN PTD */
+typedef enum {
+    GAME_STATE_PLAYING,
+    GAME_STATE_OVER
+} GameState_t;
+
+// Định nghĩa struct cho player (trex), obstacle (cactus), và heart
+typedef struct {
+    int x, y;
+    int w, h;
+    int frame;  // Frame animation (0-2 cho chạy)
+    const uint8_t *bitmap;
+    const uint8_t *mask;
+} Entity_t;
+
+/* USER CODE END PTD */
+
+/* Private define ------------------------------------------------------------*/
+/* USER CODE BEGIN PD */
+#define DEBOUNCE_TIME 100
+#define PLAYER_SAFE_ZONE_WIDTH 32
+#define SPAWN_NEW_LIVE_MIN_CYCLES 800
+#define INCREASE_FPS_EVERY_N_SCORE_POINTS 200
+#define LIVES_START 3
+#define LIVES_MAX 5
+#define TARGET_FPS_START 25
+#define TARGET_FPS_MAX 55
+#define GROUND_Y 57
+#define GROUND_CACTI_SCROLL_SPEED 6
+#define GROUND_SPEED 6
+#define SSD1306_WIDTH 128
+#define SSD1306_HEIGHT 64
+void ssd1306_Line_Buffered(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, SSD1306_COLOR color);
+void ssd1306_DrawBitmap_Buffered(int16_t x, int16_t y, const uint8_t *bitmap, uint8_t w, uint8_t h, SSD1306_COLOR color);
+void ssd1306_FillRectangle_Buffered(uint8_t x, uint8_t y, uint8_t w, uint8_t h, SSD1306_COLOR color);
+/* USER CODE END PD */
+
+/* Private macro -------------------------------------------------------------*/
+/* USER CODE BEGIN PM */
+
+/* USER CODE END PM */
+
+/* Private variables ---------------------------------------------------------*/
+
+/* USER CODE BEGIN PV */
+volatile uint8_t g_jump_flag = 0;
+volatile uint8_t g_reset_flag = 0;
+
+volatile uint32_t g_last_jump_tick = 0;
+volatile uint32_t g_last_reset_tick = 0;
+
+// Biến game
+Entity_t g_player;      // Trex
+Entity_t g_cactus1;     // Obstacle 1
+Entity_t g_cactus2;     // Obstacle 2
+Entity_t g_heart;       // Heart item
+GameState_t g_gameState;
+int g_score = 0;
+int g_hi_score = 0;
+int g_lives = LIVES_START;
+bool g_game_over = false;
+bool g_night = false;
+int g_target_fps = TARGET_FPS_START;
+volatile int g_is_jumping = 0;
+volatile int g_jump_velocity = 0;
+const int g_gravity = 2;
+const int g_jump_initial_velocity = 12;
+volatile int g_ground_scroll = 0;
+uint32_t g_last_heart_spawn = 0;
+uint32_t g_cycle_count = 0;
+
+uint32_t lastGameTick = 0;
+
+const uint8_t trex_up_1s_bitmap[] = {
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x07, 0xfe, 0x00,
+    0x00, 0x06, 0xff, 0x00,
+    0x00, 0x0e, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xc0, 0x00,
+    0x00, 0x0f, 0xfc, 0x00,
+    0x40, 0x0f, 0xc0, 0x00,
+    0x40, 0x1f, 0x80, 0x00,
+    0x40, 0x7f, 0x80, 0x00,
+    0x60, 0xff, 0xe0, 0x00,
+    0x71, 0xff, 0xa0, 0x00,
+    0x7f, 0xff, 0x80, 0x00,
+    0x7f, 0xff, 0x80, 0x00,
+    0x7f, 0xff, 0x80, 0x00,
+    0x3f, 0xff, 0x00, 0x00,
+    0x1f, 0xff, 0x00, 0x00,
+    0x0f, 0xfe, 0x00, 0x00,
+    0x03, 0xfc, 0x00, 0x00,
+    0x01, 0xdc, 0x00, 0x00,
+    0x01, 0x8c, 0x00, 0x00,
+    0x01, 0x8c, 0x00, 0x00,
+    0x01, 0x0c, 0x00, 0x00,
+    0x01, 0x8e, 0x00, 0x00
+};
+
+const uint8_t trex_up_1s_mask[] = {  // Copy bitmap cho mask cơ bản (set 0xFF ở vùng pixel để clear)
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x07, 0xfe, 0x00,
+    0x00, 0x07, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xc0, 0x00,
+    0x00, 0x0f, 0xfc, 0x00,
+    0x40, 0x0f, 0xc0, 0x00,
+    0x40, 0x1f, 0x80, 0x00,
+    0x40, 0x7f, 0x80, 0x00,
+    0x60, 0xff, 0xe0, 0x00,
+    0x71, 0xff, 0xa0, 0x00,
+    0x7f, 0xff, 0x80, 0x00,
+    0x7f, 0xff, 0x80, 0x00,
+    0x7f, 0xff, 0x80, 0x00,
+    0x3f, 0xff, 0x00, 0x00,
+    0x1f, 0xff, 0x00, 0x00,
+    0x0f, 0xfe, 0x00, 0x00,
+    0x03, 0xfc, 0x00, 0x00,
+    0x01, 0xdc, 0x00, 0x00,
+    0x01, 0x8c, 0x00, 0x00,
+    0x01, 0x8c, 0x00, 0x00,
+    0x01, 0x0c, 0x00, 0x00,
+    0x01, 0x8e, 0x00, 0x00
+};
+
+const uint8_t trex_up_2s_bitmap[] = {
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x07, 0xfe, 0x00,
+    0x00, 0x06, 0xff, 0x00,
+    0x00, 0x0e, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xc0, 0x00,
+    0x00, 0x0f, 0xfc, 0x00,
+    0x40, 0x0f, 0xc0, 0x00,
+    0x40, 0x1f, 0x80, 0x00,
+    0x40, 0x7f, 0x80, 0x00,
+    0x60, 0xff, 0xe0, 0x00,
+    0x71, 0xff, 0xa0, 0x00,
+    0x7f, 0xff, 0x80, 0x00,
+    0x7f, 0xff, 0x80, 0x00,
+    0x7f, 0xff, 0x80, 0x00,
+    0x3f, 0xff, 0x00, 0x00,
+    0x1f, 0xff, 0x00, 0x00,
+    0x0f, 0xfe, 0x00, 0x00,
+    0x03, 0xfc, 0x00, 0x00,
+    0x01, 0xfc, 0x00, 0x00,
+    0x01, 0x8c, 0x00, 0x00,
+    0x01, 0x8c, 0x00, 0x00,
+    0x01, 0x0e, 0x00, 0x00,
+    0x01, 0x86, 0x00, 0x00
+};
+
+const uint8_t trex_up_2s_mask[] = {  // Tương tự, copy và adjust nếu cần
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x07, 0xfe, 0x00,
+    0x00, 0x07, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xc0, 0x00,
+    0x00, 0x0f, 0xfc, 0x00,
+    0x40, 0x0f, 0xc0, 0x00,
+    0x40, 0x1f, 0x80, 0x00,
+    0x40, 0x7f, 0x80, 0x00,
+    0x60, 0xff, 0xe0, 0x00,
+    0x71, 0xff, 0xa0, 0x00,
+    0x7f, 0xff, 0x80, 0x00,
+    0x7f, 0xff, 0x80, 0x00,
+    0x7f, 0xff, 0x80, 0x00,
+    0x3f, 0xff, 0x00, 0x00,
+    0x1f, 0xff, 0x00, 0x00,
+    0x0f, 0xfe, 0x00, 0x00,
+    0x03, 0xfc, 0x00, 0x00,
+    0x01, 0xfc, 0x00, 0x00,
+    0x01, 0x8c, 0x00, 0x00,
+    0x01, 0x8c, 0x00, 0x00,
+    0x01, 0x0e, 0x00, 0x00,
+    0x01, 0x86, 0x00, 0x00
+};
+
+const uint8_t trex_up_3s_bitmap[] = {
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x07, 0xfe, 0x00,
+    0x00, 0x06, 0xff, 0x00,
+    0x00, 0x0e, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xc0, 0x00,
+    0x00, 0x0f, 0xfc, 0x00,
+    0x40, 0x0f, 0xc0, 0x00,
+    0x40, 0x1f, 0x80, 0x00,
+    0x40, 0x7f, 0x80, 0x00,
+    0x60, 0xff, 0xe0, 0x00,
+    0x71, 0xff, 0xa0, 0x00,
+    0x7f, 0xff, 0x80, 0x00,
+    0x7f, 0xff, 0x80, 0x00,
+    0x7f, 0xff, 0x80, 0x00,
+    0x3f, 0xff, 0x00, 0x00,
+    0x1f, 0xff, 0x00, 0x00,
+    0x0f, 0xfe, 0x00, 0x00,
+    0x03, 0xfc, 0x00, 0x00,
+    0x01, 0xdc, 0x00, 0x00,
+    0x01, 0x8c, 0x00, 0x00,
+    0x01, 0x8c, 0x00, 0x00,
+    0x01, 0x06, 0x00, 0x00,
+    0x01, 0x83, 0x00, 0x00
+};
+
+const uint8_t trex_up_3s_mask[] = {  // Copy và adjust
+    0x00, 0x00, 0x00, 0x00,
+    0x00, 0x07, 0xfe, 0x00,
+    0x00, 0x07, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xff, 0x00,
+    0x00, 0x0f, 0xc0, 0x00,
+    0x00, 0x0f, 0xfc, 0x00,
+    0x40, 0x0f, 0xc0, 0x00,
+    0x40, 0x1f, 0x80, 0x00,
+    0x40, 0x7f, 0x80, 0x00,
+    0x60, 0xff, 0xe0, 0x00,
+    0x71, 0xff, 0xa0, 0x00,
+    0x7f, 0xff, 0x80, 0x00,
+    0x7f, 0xff, 0x80, 0x00,
+    0x7f, 0xff, 0x80, 0x00,
+    0x3f, 0xff, 0x00, 0x00,
+    0x1f, 0xff, 0x00, 0x00,
+    0x0f, 0xfe, 0x00, 0x00,
+    0x03, 0xfc, 0x00, 0x00,
+    0x01, 0xdc, 0x00, 0x00,
+    0x01, 0x8c, 0x00, 0x00,
+    0x01, 0x8c, 0x00, 0x00,
+    0x01, 0x06, 0x00, 0x00,
+    0x01, 0x83, 0x00, 0x00
+};
+const uint8_t cacti_big_big_bitmap[] = {
+
+0x00, 0x00, 0x00, 0x00, 0x7B, 0x7B, 0xDB, 0xE0, 0x77, 0xBB, 0xBD, 0xE0, 0x77, 0xBE, 0xBD, 0xE0,
+0x77, 0xBD, 0x3D, 0xE0, 0x77, 0xAB, 0xBD, 0x60, 0x57, 0x93, 0xBC, 0xA0, 0x27, 0xBB, 0xBD, 0xC0,
+0x77, 0xBB, 0xBD, 0xC0, 0x77, 0xBB, 0xBD, 0xC0, 0x77, 0xBB, 0xBD, 0xC0, 0x77, 0xBB, 0xFD, 0xC0,
+0x77, 0xB9, 0xFD, 0xC0, 0x77, 0xBA, 0xFF, 0xC0, 0x7F, 0xF7, 0x3F, 0xA0, 0x3F, 0xE8, 0x3F, 0x60,
+0x5F, 0x98, 0x3C, 0xE0, 0x67, 0xB8, 0x3D, 0xE0, 0x77, 0xBB, 0xBD, 0xE0, 0x77, 0xBB, 0xBD, 0xE0,
+0x77, 0xBB, 0xBC, 0x00, 0x77, 0xBB, 0xBC, 0x00, 0x47, 0x8A, 0x3C, 0x00, 0x5F, 0xAA, 0xFC, 0x60,
+0x40, 0x0A, 0x01, 0x60, 0x01, 0x00, 0x40, 0x00,
+};
+
+const uint8_t cacti_big_big_mask[] = {
+
+0x03, 0x00, 0x18, 0x00, 0x07, 0x80, 0x3C, 0x00, 0x0F, 0xC0, 0x7E, 0x00, 0x0F, 0xC1, 0x7E, 0x00,
+0x0F, 0xC3, 0xFE, 0x00, 0x0F, 0xD7, 0xFE, 0x80, 0x2F, 0xFF, 0xFF, 0xC0, 0x7F, 0xFF, 0xFF, 0xE0,
+0xFF, 0xFF, 0xFF, 0xE0, 0xFF, 0xFF, 0xFF, 0xE0, 0xFF, 0xFF, 0xFF, 0xE0, 0xFF, 0xFF, 0xFF, 0xE0,
+0xFF, 0xFF, 0xFF, 0xE0, 0xFF, 0xFD, 0xFF, 0xE0, 0xFF, 0xF8, 0xFF, 0xC0, 0x7F, 0xF0, 0x7F, 0x80,
+0x3F, 0xE0, 0x7F, 0x00, 0x1F, 0xC0, 0x7E, 0x00, 0x0F, 0xC0, 0x7E, 0x00, 0x0F, 0xC0, 0x7E, 0x00,
+0x0F, 0xC0, 0x7E, 0x00, 0x0F, 0xC0, 0x7E, 0x00, 0x3F, 0xF1, 0xFE, 0x00, 0x3F, 0xF1, 0xFF, 0x80,
+0x3F, 0xF1, 0xFF, 0x80, 0xFF, 0xFF, 0xFF, 0xE0,
+};
+
+const uint8_t cacti_small_big_bitmap[] = {
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x68, 0x75, 0xD6, 0xE0,
+0x6C, 0xCE, 0xA6, 0x60, 0x6D, 0x2E, 0xB6, 0xA0, 0x4D, 0xAE, 0x36, 0xC0, 0x2D, 0xAE, 0xB6, 0xC0,
+0x6D, 0xAE, 0xB6, 0xC0, 0x6D, 0xAE, 0xB6, 0xC0, 0x6D, 0xAE, 0xB6, 0xC0, 0x6F, 0x2E, 0x9E, 0xC0,
+0x6C, 0xAE, 0xA7, 0xA0, 0x3D, 0xBE, 0xB6, 0x60, 0x4D, 0xDF, 0xB6, 0xE0, 0x6D, 0xEF, 0x76, 0xE0,
+0x6D, 0xEE, 0xF6, 0xE0, 0x6D, 0xEE, 0xF6, 0xE0, 0x6D, 0xEE, 0xF6, 0xE0, 0x6D, 0x8E, 0x16, 0x00,
+0x60, 0x20, 0x50, 0x40, 0x01, 0x00, 0x02, 0x00,
+};
+
+const uint8_t cacti_small_big_mask[] = {
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x06, 0x00, 0x1C, 0x0E, 0x2F, 0x00,
+0x1F, 0x3F, 0x7F, 0x80, 0x1F, 0xFF, 0x7F, 0xC0, 0x3F, 0xFF, 0xFF, 0xE0, 0x7F, 0xFF, 0xFF, 0xE0,
+0xFF, 0xFF, 0xFF, 0xE0, 0xFF, 0xFF, 0xFF, 0xE0, 0xFF, 0xFF, 0xFF, 0xE0, 0xFF, 0xFF, 0xFF, 0xE0,
+0xFF, 0x7F, 0xDF, 0xC0, 0x7E, 0x7F, 0xCF, 0x80, 0x3E, 0x3F, 0xCF, 0x00, 0x1E, 0x1F, 0x8F, 0x00,
+0x1E, 0x1F, 0x0F, 0x00, 0x1E, 0x1F, 0x0F, 0x00, 0x1E, 0x1F, 0x0F, 0x00, 0x1E, 0x7F, 0xEF, 0xE0,
+0x1F, 0xFF, 0xEF, 0xE0, 0xFF, 0xFF, 0xFF, 0xE0,
+};
+
+const uint8_t heart_bitmap[] = {  // W=8, H=8 (placeholder, replace with hearts_5x_bm from GitHub, adjust for single)
+    0x00, 0x66, 0xff, 0xff, 0x7e, 0x3c, 0x18, 0x00
+};
+/* USER CODE END PV */
+
+/* Private function prototypes -----------------------------------------------*/
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+/* USER CODE BEGIN PFP */
+void handle_jump_press(void);
+void handle_reset_press(void);
+void update_game_logic(void);
+void render_game(void);
+void ssd1306_DrawBitmap_Masked(int16_t x, int16_t y, const uint8_t *bitmap, const uint8_t *mask, uint8_t w, uint8_t h, SSD1306_COLOR color);
+bool Check_Collision(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2);
+void Render_Ground(int y);
+void Render_Number(int x, int y, int number);
+void Render_Heart(int lives);
+void Save_Hi_Score(int score);
+/* USER CODE END PFP */
+
+/* Private user code ---------------------------------------------------------*/
+/* USER CODE BEGIN 0 */
+/* USER CODE END 0 */
+
+/**
+  * @brief  The application entry point.
+  * @retval int
+  */
+int main(void)
+{
+
+  /* USER CODE BEGIN 1 */
+
+  /* USER CODE END 1 */
+
+  /* MCU Configuration--------------------------------------------------------*/
+
+  /* Reset of all peripherals, Initializes the Flash interface and the Systick. */
+  HAL_Init();
+
+  /* USER CODE BEGIN Init */
+
+  /* USER CODE END Init */
+
+  /* Configure the system clock */
+  SystemClock_Config();
+
+  /* USER CODE BEGIN SysInit */
+
+  /* USER CODE END SysInit */
+
+  /* Initialize all configured peripherals */
+  MX_GPIO_Init();
+  /* USER CODE BEGIN 2 */
+  // <<< SỬA LỖI: Khởi tạo màn hình và các biến game
+  ssd1306_Init(); // Đảm bảo bạn đã có file ssd1306.c/.h trong dự án
+
+  // Khởi tạo trạng thái và đối tượng
+  g_gameState = GAME_STATE_PLAYING;
+  g_player.x = 10;
+  g_player.y = 30;
+  g_player.w = 28;
+  g_player.h = 27;
+  g_player.frame = 0;
+  g_player.bitmap = trex_up_1s_bitmap;
+  g_player.mask = trex_up_1s_mask;
+
+  g_cactus1.x = 128;
+  g_cactus1.y = GROUND_Y - 24;
+  g_cactus1.w = 32;
+  g_cactus1.h = 26;
+  g_cactus1.bitmap = cacti_big_big_bitmap;
+  g_cactus1.mask = cacti_big_big_mask;
+
+  g_cactus2.x = 200;
+  g_cactus2.y = GROUND_Y - 24;
+  g_cactus2.w = 32;
+  g_cactus2.h = 26;
+  g_cactus2.bitmap = cacti_small_big_bitmap;
+  g_cactus2.mask = cacti_small_big_mask;
+
+  g_heart.x = 255;  // Off-screen ban đầu
+  g_heart.y = 20;   // Vị trí heart
+  g_heart.w = 8;
+  g_heart.h = 8;
+  g_heart.bitmap = heart_bitmap;
+  g_heart.mask = NULL;  // Không cần mask cho heart
+
+  g_score = 0;
+  g_hi_score = *(__IO uint16_t*)0x0800FC00;  // Đọc hi score từ flash
+  lastGameTick = 0;
+  /* USER CODE END 2 */
+
+  /* Infinite loop */
+  /* USER CODE BEGIN WHILE */
+  while (1)
+  {
+    /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
+    if (HAL_GetTick() - lastGameTick > (1000 / g_target_fps))
+    {
+        lastGameTick = HAL_GetTick();
+
+        if (g_gameState == GAME_STATE_PLAYING) {
+            update_game_logic();
+        }
+        render_game();
+        g_cycle_count++;
+    }
+
+    // Xử lý cờ ngắt
+    if (g_jump_flag == 1) {
+        g_jump_flag = 0;
+        if (g_gameState == GAME_STATE_PLAYING) {
+            handle_jump_press();
+        }
+    }
+
+    if (g_reset_flag == 1) {
+        g_reset_flag = 0;
+        if (g_gameState == GAME_STATE_OVER) {
+            handle_reset_press();
+        }
+    }
+  }
+  /* USER CODE END 3 */
+}
+
+/**
+  * @brief System Clock Configuration
+  * @retval None
+  */
+void SystemClock_Config(void)
+{
+  RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+  RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+
+  /** Configure the main internal regulator output voltage
+  */
+  __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE1);
+
+  /** Initializes the RCC Oscillators according to the specified parameters
+  * in the RCC_OscInitTypeDef structure.
+  */
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+  RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+  RCC_OscInitStruct.PLL.PLLMUL = RCC_PLL_MUL4;
+  RCC_OscInitStruct.PLL.PLLDIV = RCC_PLL_DIV2;
+  if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Initializes the CPU, AHB and APB buses clocks
+  */
+  RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                              |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+}
+
+/**
+  * @brief GPIO Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_GPIO_Init(void)
+{
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
+/* USER CODE BEGIN MX_GPIO_Init_1 */
+/* USER CODE END MX_GPIO_Init_1 */
+
+  /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12|GPIO_PIN_13, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : PC13 */
+  GPIO_InitStruct.Pin = GPIO_PIN_13;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PB12 PB13 */
+  GPIO_InitStruct.Pin = GPIO_PIN_12|GPIO_PIN_13;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PB3 */
+  GPIO_InitStruct.Pin = GPIO_PIN_3;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI3_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI3_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+
+/* USER CODE BEGIN MX_GPIO_Init_2 */
+/* USER CODE END MX_GPIO_Init_2 */
+}
+
+/* USER CODE BEGIN 4 */
+void ssd1306_Line_Buffered(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, SSD1306_COLOR color) {
+    // Chỉ xử lý đường ngang
+    if (y1 == y2) {
+        uint8_t start_x = (x1 < x2) ? x1 : x2;
+        uint8_t end_x = (x1 > x2) ? x1 : x2;
+
+        // Đảm bảo không vẽ ra ngoài màn hình
+        if (start_x >= SSD1306_WIDTH || end_x < 0 || y1 >= SSD1306_HEIGHT) {
+            return;
+        }
+        if (start_x < 0) start_x = 0;
+        if (end_x >= SSD1306_WIDTH) end_x = SSD1306_WIDTH - 1;
+
+        for (uint8_t x = start_x; x <= end_x; x++) {
+            ssd1306_DrawPixel(x, y1, color); // Hàm này an toàn, vẽ vào buffer
+        }
+    }
+}
+
+// === HÀM VẼ BITMAP MỚI
+void ssd1306_DrawBitmap_Buffered(int16_t x, int16_t y, const uint8_t *bitmap, uint8_t w, uint8_t h, SSD1306_COLOR color) {
+    uint16_t byteWidth = (w + 7) / 8;
+    uint8_t byteB;
+
+    for (uint8_t j = 0; j < h; j++) {
+        for (uint8_t i = 0; i < w; i++) {
+
+            int16_t pixel_x = x + i;
+            int16_t pixel_y = y + j;
+
+            // Clip
+            if (pixel_x < 0 || pixel_x >= SSD1306_WIDTH || pixel_y < 0 || pixel_y >= SSD1306_HEIGHT) {
+                continue;
+            }
+
+            // SỬA LỖI 2: Logic đọc bit
+            if (i % 8 == 0) {
+                byteB = bitmap[j * byteWidth + i / 8];
+            }
+            // (Đã xóa dòng "else { byteB <<= 1; }")
+
+            // SỬA LỖI 2: Logic kiểm tra bit
+            // (Dùng (0x80 >> (i % 8)) thay vì (& 0x80))
+            if (byteB & (0x80 >> (i % 8))) {
+                ssd1306_DrawPixel((uint8_t)pixel_x, (uint8_t)pixel_y, color);
+            }
+        }
+    }
+}
+
+void ssd1306_FillRectangle_Buffered(uint8_t x, uint8_t y, uint8_t w, uint8_t h, SSD1306_COLOR color) {
+    if (x >= SSD1306_WIDTH || y >= SSD1306_HEIGHT) return;
+    if (x + w > SSD1306_WIDTH) w = SSD1306_WIDTH - x;
+    if (y + h > SSD1306_HEIGHT) h = SSD1306_HEIGHT - y;
+    for (uint8_t i = 0; i < w; i++) {
+        for (uint8_t j = 0; j < h; j++) {
+            ssd1306_DrawPixel(x + i, y + j, color);
+        }
+    }
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+    if (GPIO_Pin == GPIO_PIN_3)
+    {
+        if (HAL_GetTick() - g_last_jump_tick > DEBOUNCE_TIME)
+        {
+            g_last_jump_tick = HAL_GetTick();
+            g_jump_flag = 1;
+        }
+    }
+    if (GPIO_Pin == GPIO_PIN_13)
+    {
+        if (HAL_GetTick() - g_last_reset_tick > DEBOUNCE_TIME)
+        {
+            g_last_reset_tick = HAL_GetTick();
+            g_reset_flag = 1;
+        }
+    }
+}
+
+void handle_jump_press() {
+    if (g_is_jumping == 0) {
+        g_is_jumping = 1;
+        g_jump_velocity = g_jump_initial_velocity;
+    }
+}
+
+void handle_reset_press() {
+    g_gameState = GAME_STATE_PLAYING;
+    g_player.x = 10;
+    g_player.y = 30;
+    g_is_jumping = 0;
+    g_jump_velocity = 0;
+
+    g_cactus1.x = 128;
+    g_cactus2.x = 200;
+    g_heart.x = 255;
+    g_score = 0;
+    g_lives = LIVES_START;
+    g_game_over = false;
+    g_target_fps = TARGET_FPS_START;
+    g_night = false;
+    ssd1306_WriteCommand(0xA6);
+    render_game();
+}
+
+void update_game_logic() {
+    if (g_is_jumping) {
+        g_player.y -= g_jump_velocity;
+        g_jump_velocity -= g_gravity;
+        if (g_player.y >= 30) {
+            g_player.y = 30;
+            g_is_jumping = 0;
+            g_jump_velocity = 0;
+        }
+    }
+    g_player.frame = (g_player.frame + 1) % 3;
+    switch (g_player.frame) {
+        case 0: g_player.bitmap = trex_up_1s_bitmap; g_player.mask = trex_up_1s_mask; break;
+        case 1: g_player.bitmap = trex_up_2s_bitmap; g_player.mask = trex_up_2s_mask; break;
+        case 2: g_player.bitmap = trex_up_3s_bitmap; g_player.mask = trex_up_3s_mask; break;
+    }
+
+    g_cactus1.x -= GROUND_CACTI_SCROLL_SPEED;
+    g_cactus2.x -= GROUND_CACTI_SCROLL_SPEED;
+
+    if (g_cactus1.x + g_cactus1.w < 0) {
+        g_cactus1.x = 128 + (rand() % 100);
+        if (rand() % 2) {
+            g_cactus1.bitmap = cacti_big_big_bitmap;
+            g_cactus1.mask = cacti_big_big_mask;
+        } else {
+            g_cactus1.bitmap = cacti_small_big_bitmap;
+            g_cactus1.mask = cacti_small_big_mask;
+        }
+    }
+
+    if (g_cactus2.x + g_cactus2.w < 0) {
+        g_cactus2.x = g_cactus1.x + PLAYER_SAFE_ZONE_WIDTH + (rand() % 200);
+        if (rand() % 2) {
+            g_cactus2.bitmap = cacti_big_big_bitmap;
+            g_cactus2.mask = cacti_big_big_mask;
+        } else {
+            g_cactus2.bitmap = cacti_small_big_bitmap;
+            g_cactus2.mask = cacti_small_big_mask;
+        }
+    }
+
+    // Spawn heart
+    if (g_cycle_count - g_last_heart_spawn > SPAWN_NEW_LIVE_MIN_CYCLES && g_lives < LIVES_MAX) {
+    	do {
+    	    g_heart.x = 128 + (rand() % 50);
+    	} while (abs(g_heart.x - g_cactus1.x) < 20 || abs(g_heart.x - g_cactus2.x) < 20);
+        g_last_heart_spawn = g_cycle_count;
+    }
+    if (g_heart.x < 255) {
+        g_heart.x -= GROUND_CACTI_SCROLL_SPEED;
+        if (Check_Collision(g_player.x, g_player.y, g_player.w, g_player.h, g_heart.x, g_heart.y, g_heart.w, g_heart.h)) {
+            g_lives = (g_lives + 1 > LIVES_MAX) ? LIVES_MAX : g_lives + 1;
+            g_heart.x = 255;
+        }
+        if (g_heart.x + g_heart.w < 0) g_heart.x = 255;
+    }
+
+    // Va chạm
+    int player_x = g_player.x + 3;
+    int player_y = g_player.y + 3;
+    int player_w = g_player.w - 6;
+    int player_h = g_player.h - 6;
+
+    int cactus1_x = g_cactus1.x + 3;
+    int cactus1_y = g_cactus1.y + 3;
+    int cactus1_w = g_cactus1.w - 6;
+    int cactus1_h = g_cactus1.h - 6;
+
+    int cactus2_x = g_cactus2.x + 3;
+    int cactus2_y = g_cactus2.y + 3;
+    int cactus2_w = g_cactus2.w - 6;
+    int cactus2_h = g_cactus2.h - 6;
+    static bool cactus1_collided = false;
+    static bool cactus2_collided = false;
+
+    bool hit_cactus1 = Check_Collision(player_x, player_y, player_w, player_h,
+                                       cactus1_x, cactus1_y, cactus1_w, cactus1_h);
+    bool hit_cactus2 = Check_Collision(player_x, player_y, player_w, player_h,
+                                       cactus2_x, cactus2_y, cactus2_w, cactus2_h);
+
+    // Xu ly xuong rong 1
+    if (hit_cactus1 && !cactus1_collided) {
+        g_lives--;
+        cactus1_collided = true;
+    } else if (!hit_cactus1 && g_cactus1.x + g_cactus1.w < g_player.x) {
+        cactus1_collided = false; // reset khi da qua Trex
+    }
+    if (g_cactus1.x + g_cactus1.w < 0) cactus1_collided = false;
+    if (g_cactus2.x + g_cactus2.w < 0) cactus2_collided = false;
+
+    // Xu ly xuong rong 2
+    if (hit_cactus2 && !cactus2_collided) {
+        g_lives--;
+        cactus2_collided = true;
+    } else if (!hit_cactus2 && g_cactus2.x + g_cactus2.w < g_player.x) {
+        cactus2_collided = false;
+    }
+
+    if (g_lives <= 0) {
+        g_game_over = true;
+        g_gameState = GAME_STATE_OVER;
+        return;
+    }
+
+    // Cập nhật score
+    g_score++;
+    if (g_score > g_hi_score) g_hi_score = g_score;
+    // Tăng FPS
+    if (g_score > 0 % INCREASE_FPS_EVERY_N_SCORE_POINTS == 0 && g_target_fps < TARGET_FPS_MAX) g_target_fps++;
+}
+
+void render_game() {
+	void render_game() {
+	    ssd1306_Fill(Black);
+
+	    if (g_gameState == GAME_STATE_PLAYING) {
+	        // VẼ HẾT VÀO BUFFER TRƯỚC
+	        ssd1306_DrawBitmap_Masked(g_player.x, g_player.y, g_player.bitmap, g_player.mask, g_player.w, g_player.h, White);
+	        ssd1306_DrawBitmap_Masked(g_cactus1.x, g_cactus1.y, g_cactus1.bitmap, g_cactus1.mask, g_cactus1.w, g_cactus1.h, White);
+	        ssd1306_DrawBitmap_Masked(g_cactus2.x, g_cactus2.y, g_cactus2.bitmap, g_cactus2.mask, g_cactus2.w, g_cactus2.h, White);
+
+	        if (g_heart.x < 255) {
+	            ssd1306_DrawBitmap_Buffered(g_heart.x, g_heart.y, g_heart.bitmap, g_heart.w, g_heart.h, White);
+	        }
+
+	        Render_Ground(GROUND_Y);
+
+	        // VẼ SCORE SAU CÙNG
+	        ssd1306_FillRectangle_Buffered(0, 0, 128, 18, Black);
+	        ssd1306_SetCursor(45, 0);
+	        ssd1306_WriteString("HI", Font_7x10, White);
+	        Render_Number(63, 0, g_hi_score);
+	        Render_Number(45, 10, g_score);
+	        Render_Heart(g_lives);
+
+	        // === FIX DUY NHẤT: KHÔNG BAO GIỜ ĐỂ y_start > 0 TRONG UpdateArea ===
+	        // → Luôn bắt đầu từ y=0, height đủ lớn
+	        uint8_t top_height = (g_player.y + g_player.h + 10);
+	        if (top_height < 50) top_height = 50;
+
+	        // 1. Vùng chính: từ đầu màn hình đến chân Dino
+	        ssd1306_UpdateArea(0, 0, 128, top_height);
+
+	        // 2. Ground cố định
+	        ssd1306_UpdateArea(0, GROUND_Y - 2, 128, 12);
+
+	        // 3. Cactus + Heart (chỉ vùng nhỏ)
+	        if (g_cactus1.x < 130) {
+	            int16_t x1 = g_cactus1.x - 2; if (x1 < 0) x1 = 0;
+	            ssd1306_UpdateArea(x1, 0, g_cactus1.w + 4, 64);  // y=0, height=64 → an toàn tuyệt đối
+	        }
+	        if (g_cactus2.x < 130) {
+	            int16_t x2 = g_cactus2.x - 2; if (x2 < 0) x2 = 0;
+	            ssd1306_UpdateArea(x2, 0, g_cactus2.w + 4, 64);
+	        }
+	        if (g_heart.x < 255) {
+	            int16_t xh = g_heart.x - 2; if (xh < 0) xh = 0;
+	            ssd1306_UpdateArea(xh, 0, g_heart.w + 4, 64);
+	        }
+
+	    } else {
+	        ssd1306_SetCursor(30, 20);
+	        ssd1306_WriteString("GAME OVER", Font_7x10, White);
+	        ssd1306_SetCursor(30, 35);
+	        char score_str[15];
+	        sprintf(score_str, "Score: %d", g_score);
+	        ssd1306_WriteString(score_str, Font_7x10, White);
+	        ssd1306_SetCursor(26, 50);
+	        ssd1306_WriteString("Press RESET", Font_7x10, White);
+	        Save_Hi_Score(g_hi_score);
+	        ssd1306_UpdateScreen();
+	    }
+	}
+}
+
+// Hàm ssd1306_DrawBitmap_Masked
+void ssd1306_DrawBitmap_Masked(int16_t x, int16_t y, const uint8_t *bitmap, const uint8_t *mask, uint8_t w, uint8_t h, SSD1306_COLOR color){
+	uint16_t byteWidth = (w + 7) / 8;
+    uint8_t byteB, byteM;
+
+    for (uint8_t j = 0; j < h; j++) {
+        for (uint8_t i = 0; i < w; i++) {
+
+            // SỬA LỖI 1: Dùng int16_t để tính toán, tránh tràn số
+            int16_t pixel_x = x + i;
+            int16_t pixel_y = y + j;
+
+            // Clip (Cắt) những pixel ngoài màn hình
+            if (pixel_x < 0 || pixel_x >= SSD1306_WIDTH || pixel_y < 0 || pixel_y >= SSD1306_HEIGHT) {
+                continue;
+            }
+
+            // SỬA LỖI 2: Logic đọc bit
+            if (i % 8 == 0) {
+                byteB = bitmap[j * byteWidth + i / 8];
+                byteM = mask[j * byteWidth + i / 8];
+            }
+            // (Đã xóa các dòng "else { ... <<= 1; }")
+
+            // SỬA LỖI 2: Logic kiểm tra bit
+            // (Dùng (0x80 >> (i % 8)) thay vì (& 0x80))
+            if (byteM & (0x80 >> (i % 8))) {
+                if (byteB & (0x80 >> (i % 8)))
+                    // Đã clip, ép kiểu về uint8_t an toàn
+                    ssd1306_DrawPixel((uint8_t)pixel_x, (uint8_t)pixel_y, color);
+                else
+                    ssd1306_DrawPixel((uint8_t)pixel_x, (uint8_t)pixel_y, Black);
+            }
+        }
+    }
+}
+// Hàm Check_Collision
+bool Check_Collision(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int h2) {
+    return (x1 < x2 + w2 && x1 + w1 > x2 && y1 < y2 + h2 && y1 + h1 > y2);
+}
+
+// Hàm Render_Ground
+void Render_Ground(int y) {
+    int start_x = g_ground_scroll % 128;
+    ssd1306_Line_Buffered(start_x, y, 127, y, White);
+    if (start_x > 0) {
+        ssd1306_Line_Buffered(0, y, start_x - 1, y, White);
+    }
+    g_ground_scroll = (g_ground_scroll + GROUND_SPEED) % 128;
+}
+
+// Hàm Render_Number
+void Render_Number(int x, int y, int number) {
+    char str[6];
+    sprintf(str, "%05d", number);
+    ssd1306_SetCursor(x, y);
+    ssd1306_WriteString(str, Font_7x10, White);
+}
+
+// Hàm Render_Heart
+void Render_Heart(int lives) {
+    for (int i = 0; i < lives; i++) {
+        ssd1306_DrawBitmap_Buffered(95 + i * 10, 8, heart_bitmap, 8, 8, White);
+    }
+}
+
+// Hàm Save_Hi_Score
+void Save_Hi_Score(int score) {
+    HAL_FLASH_Unlock();
+    FLASH_EraseInitTypeDef EraseInitStruct;
+    EraseInitStruct.TypeErase = FLASH_TYPEERASE_PAGES;
+    EraseInitStruct.PageAddress = 0x0800FC00;
+    EraseInitStruct.NbPages = 1;
+    uint32_t PageError = 0;
+    HAL_FLASHEx_Erase(&EraseInitStruct, &PageError);
+    HAL_FLASH_Program(FLASH_TYPEPROGRAMDATA_HALFWORD, 0x0800FC00, score);
+    HAL_FLASH_Lock();
+}
+
+/* USER CODE END 4 */
+
+/**
+  * @brief  This function is executed in case of error occurrence.
+  * @retval None
+  */
+void Error_Handler(void)
+{
+  /* USER CODE BEGIN Error_Handler_Debug */
+  /* User can add his own implementation to report the HAL error return state */
+  __disable_irq();
+  while (1)
+  {
+  }
+  /* USER CODE END Error_Handler_Debug */
+}
+
+#ifdef  USE_FULL_ASSERT
+/**
+  * @brief  Reports the name of the source file and the source line number
+  * where the assert_param error has occurred.
+  * @param  file: pointer to the source file name
+  * @param  line: assert_param error line source number
+  * @retval None
+  */
+void assert_failed(uint8_t *file, uint32_t line)
+{
+  /* USER CODE BEGIN 6 */
+  /* User can add his own implementation to report the file name and line number,
+     ex: printf("Wrong parameters value: file %s on line %d\r\n", file, line) */
+  /* USER CODE END 6 */
+}
+#endif /* USE_FULL_ASSERT */

@@ -1,0 +1,9 @@
+../Core/Src/FLASH.c:10:6:Flash_erase	40	static
+../Core/Src/FLASH.c:23:6:Flash_write_int	24	static
+../Core/Src/FLASH.c:30:6:Flash_Write_Float	32	static
+../Core/Src/FLASH.c:39:6:Flash_write_array	40	static
+../Core/Src/FLASH.c:51:6:Flash_write_struct	16	static
+../Core/Src/FLASH.c:56:5:Flash_read_int	16	static
+../Core/Src/FLASH.c:61:7:Flash_Read_Float	24	static
+../Core/Src/FLASH.c:67:6:Flash_read_array	32	static
+../Core/Src/FLASH.c:77:6:Flash_read_struct	16	static

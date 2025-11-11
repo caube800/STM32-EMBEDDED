@@ -1,0 +1,11 @@
+../Core/Src/main.c:67:9:decToBcd	1
+../Core/Src/main.c:72:5:bcdToDec	1
+../Core/Src/main.c:91:6:Set_Time	1
+../Core/Src/main.c:105:6:Get_Time	1
+../Core/Src/main.c:118:7:Get_Temp	1
+../Core/Src/main.c:126:6:force_temp_conv	2
+../Core/Src/main.c:147:5:main	1
+../Core/Src/main.c:207:6:SystemClock_Config	3
+../Core/Src/main.c:245:13:MX_I2C1_Init	2
+../Core/Src/main.c:279:13:MX_GPIO_Init	1
+../Core/Src/main.c:297:6:Error_Handler	1

@@ -1,0 +1,10 @@
+16:49:07 **** Incremental Build of configuration Debug for project LED_TM1637 ****
+make -j12 all 
+arm-none-eabi-size  LED_TM1637.elf 
+   text	   data	    bss	    dec	    hex	filename
+   5372	     12	   1572	   6956	   1b2c	LED_TM1637.elf
+Finished building: default.size.stdout
+ 
+
+16:49:07 Build Finished. 0 errors, 0 warnings. (took 268ms)
+

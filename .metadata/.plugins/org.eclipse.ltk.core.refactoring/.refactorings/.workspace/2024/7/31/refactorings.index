@@ -1,0 +1,5 @@
+1722427407003	Delete resource 'check_dht11/Core/Inc/CLCD_I2C.c'
+1722427768668	Delete resource 'dht11_lcd'
+1722440898969	Delete resource 'check_dht11/Core/Inc/CLCD_I2C.h'
+1722440905431	Delete resource 'check_dht11/Core/Src/CLCD_I2C.c'
+1722440915328	Delete resource 'check_dht11/Core/Inc/i2c-lcd.h'

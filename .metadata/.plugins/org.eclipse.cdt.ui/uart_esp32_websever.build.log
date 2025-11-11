@@ -1,0 +1,17 @@
+18:06:07 **** Incremental Build of configuration Debug for project uart_esp32_websever ****
+make -j12 all 
+arm-none-eabi-gcc "../Core/Src/UartRingbuffer.c" -mcpu=cortex-m3 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F103xB -c -I../Core/Inc -I../Drivers/STM32F1xx_HAL_Driver/Inc/Legacy -I../Drivers/STM32F1xx_HAL_Driver/Inc -I../Drivers/CMSIS/Device/ST/STM32F1xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/UartRingbuffer.d" -MT"Core/Src/UartRingbuffer.o" --specs=nano.specs -mfloat-abi=soft -mthumb -o "Core/Src/UartRingbuffer.o"
+arm-none-eabi-gcc -o "uart_esp32_websever.elf" @"objects.list"   -mcpu=cortex-m3 -T"D:\workspace_1.15.0\uart_esp32_websever\STM32F103C8TX_FLASH.ld" --specs=nosys.specs -Wl,-Map="uart_esp32_websever.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: uart_esp32_websever.elf
+ 
+arm-none-eabi-size  uart_esp32_websever.elf 
+arm-none-eabi-objdump -h -S uart_esp32_websever.elf  > "uart_esp32_websever.list"
+   text	   data	    bss	    dec	    hex	filename
+  12780	    112	   2464	  15356	   3bfc	uart_esp32_websever.elf
+Finished building: default.size.stdout
+ 
+Finished building: uart_esp32_websever.list
+ 
+
+18:06:07 Build Finished. 0 errors, 0 warnings. (took 716ms)
+

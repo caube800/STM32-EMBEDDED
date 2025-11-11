@@ -1,0 +1,10 @@
+16:13:30 **** Incremental Build of configuration Debug for project servo_check ****
+make -j12 all 
+arm-none-eabi-size  servo_check.elf 
+   text	   data	    bss	    dec	    hex	filename
+   8188	     12	   1644	   9844	   2674	servo_check.elf
+Finished building: default.size.stdout
+ 
+
+16:13:30 Build Finished. 0 errors, 0 warnings. (took 276ms)
+

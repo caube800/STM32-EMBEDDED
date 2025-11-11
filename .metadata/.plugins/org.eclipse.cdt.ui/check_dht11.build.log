@@ -1,0 +1,10 @@
+15:26:19 **** Build of configuration Debug for project check_dht11 ****
+make -j12 all 
+arm-none-eabi-size  check_dht11.elf 
+   text	   data	    bss	    dec	    hex	filename
+  26144	    468	   2084	  28696	   7018	check_dht11.elf
+Finished building: default.size.stdout
+ 
+
+15:26:20 Build Finished. 0 errors, 0 warnings. (took 350ms)
+

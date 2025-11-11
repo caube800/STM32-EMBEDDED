@@ -1,0 +1,10 @@
+15:26:19 **** Build of configuration Debug for project LED_XANHLA ****
+make -j12 all 
+arm-none-eabi-size  LED_XANHLA.elf 
+   text	   data	    bss	    dec	    hex	filename
+   4624	     12	   1572	   6208	   1840	LED_XANHLA.elf
+Finished building: default.size.stdout
+ 
+
+15:26:19 Build Finished. 0 errors, 0 warnings. (took 357ms)
+

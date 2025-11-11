@@ -1,0 +1,8 @@
+../Core/Inc/dwt_stm32_delay.h:25:22:DWT_Delay_us	2
+../Core/Src/main.c:85:10:receive_data	7
+../Core/Src/main.c:128:6:convert_code	33
+../Core/Src/main.c:230:5:main	2
+../Core/Src/main.c:287:6:SystemClock_Config	3
+../Core/Src/main.c:327:13:MX_I2C1_Init	2
+../Core/Src/main.c:361:13:MX_GPIO_Init	1
+../Core/Src/main.c:400:6:Error_Handler	1

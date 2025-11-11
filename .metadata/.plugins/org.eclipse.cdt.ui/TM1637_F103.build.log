@@ -1,0 +1,10 @@
+15:58:54 **** Incremental Build of configuration Debug for project TM1637_F103 ****
+make -j12 all 
+arm-none-eabi-size  TM1637_F103.elf 
+   text	   data	    bss	    dec	    hex	filename
+   9572	     12	   1604	  11188	   2bb4	TM1637_F103.elf
+Finished building: default.size.stdout
+ 
+
+15:58:55 Build Finished. 0 errors, 0 warnings. (took 276ms)
+

@@ -1,0 +1,50 @@
+#ifndef __SSD1306_TEST_H__
+#define __SSD1306_TEST_H__
+
+#include <stdbool.h>
+#include <stdint.h>
+#include <_ansi.h>
+
+_BEGIN_STD_C
+
+// --- CÁC HẰNG SỐ CỦA GAME ---
+// (main.c cần hằng số này để tính toán)
+#define TARGET_FPS_START 25
+
+// --- CỜ SỰ KIỆN TOÀN CỤC ---
+// 'volatile' vì chúng được thay đổi bởi ngắt
+// 'extern' để báo cho file .c biết rằng chúng tồn tại ở file main.c
+extern volatile bool g_game_tick_event;
+extern volatile bool g_button_press_event;
+
+// --- CÁC HÀM API CỦA GAME ---
+
+/**
+ * @brief Khởi tạo tất cả các biến và trạng thái của game.
+ * Gọi một lần duy nhất trước khi vào vòng lặp chính.
+ */
+void Game_Init(void);
+
+/**
+ * @brief Xử lý sự kiện tick của game (cập nhật logic, vật lý và vẽ).
+ * Hàm này nên được gọi bên trong vòng lặp main() khi cờ g_game_tick_event = true.
+ * Nó sẽ tự động xóa cờ g_game_tick_event.
+ */
+void Game_ProcessTick(void);
+
+/**
+ * @brief Xử lý sự kiện input (nút bấm).
+ * Hàm này nên được gọi liên tục bên trong vòng lặp main().
+ * Nó sẽ tự động xóa cờ g_button_press_event nếu xử lý.
+ */
+void Game_HandleInput(void);
+
+
+// --- CÁC HÀM HỖ TRỢ (NỘI BỘ) ---
+// (Hàm này cần được khai báo ở đây vì ssd1306_tests.c dùng nó)
+void ssd1306_DrawBitmap_Masked(uint8_t x, uint8_t y, const uint8_t *bitmap, const uint8_t *mask, uint8_t w, uint8_t h, SSD1306_COLOR color);
+
+
+_END_STD_C
+
+#endif // __SSD1306_TEST_H__

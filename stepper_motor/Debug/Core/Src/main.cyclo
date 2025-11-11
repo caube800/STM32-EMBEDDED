@@ -1,0 +1,9 @@
+../Core/Src/main.c:60:6:delay	2
+../Core/Src/main.c:68:6:stepper_set_rpm	1
+../Core/Src/main.c:73:6:stepper_half_drive	9
+../Core/Src/main.c:134:6:stepper_step_angle	6
+../Core/Src/main.c:167:5:main	1
+../Core/Src/main.c:214:6:SystemClock_Config	3
+../Core/Src/main.c:254:13:MX_TIM1_Init	4
+../Core/Src/main.c:300:13:MX_GPIO_Init	1
+../Core/Src/main.c:332:6:Error_Handler	1

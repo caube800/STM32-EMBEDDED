@@ -1,0 +1,16 @@
+16:52:52 **** Build of configuration Debug for project check_relay ****
+make -j12 all 
+arm-none-eabi-gcc -o "check_relay.elf" @"objects.list"   -mcpu=cortex-m3 -T"D:\workspace_1.15.0\check_relay\STM32F103C8TX_FLASH.ld" --specs=nosys.specs -Wl,-Map="check_relay.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: check_relay.elf
+ 
+arm-none-eabi-size  check_relay.elf 
+arm-none-eabi-objdump -h -S check_relay.elf  > "check_relay.list"
+   text	   data	    bss	    dec	    hex	filename
+   4616	     12	   1572	   6200	   1838	check_relay.elf
+Finished building: default.size.stdout
+ 
+Finished building: check_relay.list
+ 
+
+16:52:52 Build Finished. 0 errors, 0 warnings. (took 511ms)
+

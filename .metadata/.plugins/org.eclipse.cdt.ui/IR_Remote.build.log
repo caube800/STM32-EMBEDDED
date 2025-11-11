@@ -1,0 +1,16 @@
+16:52:51 **** Build of configuration Debug for project IR_Remote ****
+make -j12 all 
+arm-none-eabi-gcc -o "IR_Remote.elf" @"objects.list"   -mcpu=cortex-m3 -T"D:\workspace_1.15.0\IR_Remote\STM32F103C8TX_FLASH.ld" --specs=nosys.specs -Wl,-Map="IR_Remote.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: IR_Remote.elf
+ 
+arm-none-eabi-size  IR_Remote.elf 
+arm-none-eabi-objdump -h -S IR_Remote.elf  > "IR_Remote.list"
+   text	   data	    bss	    dec	    hex	filename
+   8676	     12	   1660	  10348	   286c	IR_Remote.elf
+Finished building: default.size.stdout
+ 
+Finished building: IR_Remote.list
+ 
+
+16:52:51 Build Finished. 0 errors, 0 warnings. (took 542ms)
+

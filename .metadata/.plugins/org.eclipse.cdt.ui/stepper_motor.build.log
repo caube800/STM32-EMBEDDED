@@ -1,0 +1,26 @@
+14:52:18 **** Build of configuration Debug for project stepper_motor ****
+make -j12 all 
+arm-none-eabi-gcc "../Core/Src/sysmem.c" -mcpu=cortex-m3 -std=gnu11 -g3 -DUSE_HAL_DRIVER -DSTM32F103xB -DDEBUG -c -I../Drivers/CMSIS/Device/ST/STM32F1xx/Include -I../Drivers/CMSIS/Include -I../Core/Inc -I../Drivers/STM32F1xx_HAL_Driver/Inc/Legacy -I../Drivers/STM32F1xx_HAL_Driver/Inc -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/sysmem.d" -MT"Core/Src/sysmem.o" --specs=nano.specs -mfloat-abi=soft -mthumb -o "Core/Src/sysmem.o"
+../Core/Src/sysmem.c:63:1: error: unknown type name 'caddr_t'
+   63 | caddr_t _sbrk(int incr)
+      | ^~~~~~~
+../Core/Src/sysmem.c: In function '_sbrk':
+../Core/Src/sysmem.c:76:25: error: 'caddr_t' undeclared (first use in this function)
+   76 |                 return (caddr_t) -1;
+      |                         ^~~~~~~
+../Core/Src/sysmem.c:76:25: note: each undeclared identifier is reported only once for each function it appears in
+../Core/Src/sysmem.c:81:25: error: expected ';' before 'prev_heap_end'
+   81 |         return (caddr_t) prev_heap_end;
+      |                         ^~~~~~~~~~~~~~
+      |                         ;
+../Core/Src/sysmem.c:67:15: warning: variable 'prev_heap_end' set but not used [-Wunused-but-set-variable]
+   67 |         char *prev_heap_end;
+      |               ^~~~~~~~~~~~~
+../Core/Src/sysmem.c:82:1: warning: control reaches end of non-void function [-Wreturn-type]
+   82 | }
+      | ^
+make: *** [Core/Src/subdir.mk:34: Core/Src/sysmem.o] Error 1
+"make -j12 all" terminated with exit code 2. Build might be incomplete.
+
+14:52:19 Build Failed. 4 errors, 2 warnings. (took 482ms)
+

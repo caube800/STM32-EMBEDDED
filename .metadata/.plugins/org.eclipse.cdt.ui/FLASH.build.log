@@ -1,0 +1,21 @@
+16:52:49 **** Build of configuration Debug for project FLASH ****
+make -j12 all 
+arm-none-eabi-gcc "../Core/Src/FLASH.c" -mcpu=cortex-m3 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32F103xB -c -I../Core/Inc -I../Drivers/STM32F1xx_HAL_Driver/Inc/Legacy -I../Drivers/STM32F1xx_HAL_Driver/Inc -I../Drivers/CMSIS/Device/ST/STM32F1xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/FLASH.d" -MT"Core/Src/FLASH.o" --specs=nano.specs -mfloat-abi=soft -mthumb -o "Core/Src/FLASH.o"
+In file included from ../Core/Src/FLASH.c:7:
+../Core/Inc/FLASH.h:13:16: warning: junk at end of '#pragma pack' [-Wpragmas]
+   13 | #pragma pack(1); //tránh phân mảnh bộ nhớ
+      |                ^
+arm-none-eabi-gcc -o "FLASH.elf" @"objects.list"   -mcpu=cortex-m3 -T"D:\workspace_1.15.0\FLASH\STM32F103C8TX_FLASH.ld" --specs=nosys.specs -Wl,-Map="FLASH.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: FLASH.elf
+ 
+arm-none-eabi-size  FLASH.elf 
+arm-none-eabi-objdump -h -S FLASH.elf  > "FLASH.list"
+   text	   data	    bss	    dec	    hex	filename
+   4824	     12	   1608	   6444	   192c	FLASH.elf
+Finished building: default.size.stdout
+ 
+Finished building: FLASH.list
+ 
+
+16:52:50 Build Finished. 0 errors, 1 warnings. (took 1s.3ms)
+

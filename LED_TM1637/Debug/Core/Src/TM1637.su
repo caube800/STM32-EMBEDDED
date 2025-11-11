@@ -1,0 +1,8 @@
+../Core/Src/TM1637.c:34:6:Delay_us	24	static,ignoring_inline_asm
+../Core/Src/TM1637.c:45:6:start	8	static
+../Core/Src/TM1637.c:54:6:stop	8	static
+../Core/Src/TM1637.c:65:6:waitforAck	8	static
+../Core/Src/TM1637.c:76:6:writeByte	24	static
+../Core/Src/TM1637.c:97:6:TM1637_WriteData	32	static
+../Core/Src/TM1637.c:120:6:TM1637_WriteNum	40	static
+../Core/Src/TM1637.c:142:6:TM1637_WriteTime	24	static
