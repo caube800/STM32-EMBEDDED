@@ -1,28 +1,28 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <section name="Workbench">
 	<section name="org.eclipse.ui.texteditor.FindReplaceDialog">
-		<item key="selection" value="reset"/>
+		<item key="selection" value="bitmap"/>
 		<item key="wrap" value="true"/>
 		<item key="casesensitive" value="false"/>
 		<item key="wholeword" value="false"/>
 		<item key="incremental" value="false"/>
 		<item key="isRegEx" value="false"/>
 		<list key="findhistory">
-			<item value="reset"/>
-			<item value="update_game"/>
-			<item value="entity"/>
+			<item value="bitmap"/>
+			<item value="draw"/>
+			<item value="masked"/>
+			<item value="logic"/>
 			<item value="g_last_heart_spawn"/>
-			<item value="HAL_GetTick"/>
-			<item value="rand"/>
-			<item value="srand"/>
-			<item value="g_score &gt; g_hi_score"/>
-			<item value="g_score&gt;g_hi_score"/>
-			<item value="Save_Hi"/>
-			<item value="TARGET_FPS_MAX"/>
-			<item value="last_fps"/>
-			<item value="g_jump_initial_velocity"/>
-			<item value="ssd1306_SetCursor"/>
-			<item value="ground"/>
+			<item value="SPAWN_NEW_LIVE_MIN_CYCLES"/>
+			<item value="handle"/>
+			<item value="128"/>
+			<item value="g_cactus2.x"/>
+			<item value="g_cactus"/>
+			<item value="number"/>
+			<item value="define"/>
+			<item value="g_ground_scroll"/>
+			<item value="ssd1306_FillRectangle_Buffered(g_player_last.x"/>
+			<item value="fill"/>
 		</list>
 		<list key="replacehistory">
 		</list>
@@ -30,8 +30,8 @@
 	<section name="org.eclipse.ui.texteditor.FindReplaceDialog_dialogBounds">
 		<item key="DIALOG_X_ORIGIN" value="709"/>
 		<item key="DIALOG_Y_ORIGIN" value="427"/>
-		<item key="DIALOG_WIDTH" value="322"/>
-		<item key="DIALOG_HEIGHT" value="391"/>
-		<item key="DIALOG_FONT_NAME" value="1|Segoe UI|9.0|0|WINDOWS|1|-12|0|0|0|400|0|0|0|1|0|0|5|0|Segoe UI"/>
+		<item key="DIALOG_WIDTH" value="414"/>
+		<item key="DIALOG_HEIGHT" value="454"/>
+		<item key="DIALOG_FONT_NAME" value="1|Segoe UI|9.0|0|WINDOWS|1|-15|0|0|0|400|0|0|0|1|0|0|5|0|Segoe UI"/>
 	</section>
 </section>
