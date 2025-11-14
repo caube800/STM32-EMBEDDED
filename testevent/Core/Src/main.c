@@ -33,11 +33,18 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 typedef enum {
+    GAME_STATE_SPLASH,
+    GAME_STATE_MENU,
     GAME_STATE_PLAYING,
     GAME_STATE_OVER
 } GameState_t;
 
-// Định nghĩa struct cho player (trex), obstacle (cactus), và heart
+typedef enum {
+    DIFFICULTY_EASY,
+    DIFFICULTY_NORMAL,
+    DIFFICULTY_HARD
+} Difficulty_t;
+
 typedef struct {
 	int16_t x, y;
 	int16_t w, h;
@@ -50,6 +57,9 @@ typedef struct {
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define HI_SCORE_EASY_ADDR   0x0800FC00
+#define HI_SCORE_NORMAL_ADDR 0x0800FC02
+#define HI_SCORE_HARD_ADDR   0x0800FC04
 #define DEBOUNCE_TIME 100
 #define PLAYER_SAFE_ZONE_WIDTH 32
 #define SPAWN_NEW_LIVE_MIN_CYCLES 800
@@ -60,8 +70,6 @@ typedef struct {
 #define TARGET_FPS_START 25
 #define TARGET_FPS_MAX 55
 #define GROUND_Y 57
-#define GROUND_CACTI_SCROLL_SPEED 11
-#define GROUND_SPEED 11
 #define SSD1306_WIDTH 128
 #define SSD1306_HEIGHT 64
 
@@ -82,9 +90,11 @@ typedef struct {
 /* USER CODE BEGIN PV */
 volatile uint8_t g_jump_flag = 0;
 volatile uint8_t g_reset_flag = 0;
+volatile uint8_t g_quit_flag = 0;
 
 volatile uint32_t g_last_jump_tick = 0;
 volatile uint32_t g_last_reset_tick = 0;
+volatile uint32_t g_last_quit_tick = 0;
 
 // Biến game
 Entity_t g_player;
@@ -92,9 +102,14 @@ Entity_t g_cactus1;
 Entity_t g_cactus2;
 Entity_t g_heart;
 GameState_t g_gameState;
+Difficulty_t g_difficulty = DIFFICULTY_NORMAL;
+int g_menu_cursor = 1;
+bool g_menu_dirty = true;
+int g_scroll_speed = 11;
 int g_score = 0;
-int g_hi_score = 0;
+int g_hi_scores[3] = {0, 0, 0};
 int g_lives = LIVES_START;
+int g_heart_spawn_score = 300;
 bool g_game_over = false;
 bool g_night = false;
 int g_target_fps = TARGET_FPS_START;
@@ -357,10 +372,11 @@ bool Check_Collision(int x1, int y1, int w1, int h1, int x2, int y2, int w2, int
 void Render_Ground(int y);
 void Render_Number(int x, int y, int number);
 void Render_Heart(int x, int y, int lives);
-void Save_Hi_Score(int score);
+void Save_Hi_Score(void);
 void ssd1306_Line_Buffered(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, SSD1306_COLOR color);
 void ssd1306_DrawBitmap_Buffered(int16_t x, int16_t y, const uint8_t *bitmap, uint8_t w, uint8_t h, SSD1306_COLOR color);
 void ssd1306_FillRectangle_Buffered(int16_t x, int16_t y, uint8_t w, uint8_t h, SSD1306_COLOR color);
+void Render_Menu(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -399,7 +415,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   ssd1306_Init();
   // Khởi tạo trạng thái và đối tượng
-  g_gameState = GAME_STATE_PLAYING;
+  g_gameState = GAME_STATE_SPLASH;
   g_player.x = 10;
   g_player.y = 30;
   g_player.w = 28;
@@ -445,7 +461,13 @@ int main(void)
   g_heart.mask = NULL;
 
   g_score = 0;
-  g_hi_score = *(__IO uint16_t*)0x0800FC00;
+  g_hi_scores[DIFFICULTY_EASY]   = *(__IO uint16_t*)HI_SCORE_EASY_ADDR;
+  g_hi_scores[DIFFICULTY_NORMAL] = *(__IO uint16_t*)HI_SCORE_NORMAL_ADDR;
+  g_hi_scores[DIFFICULTY_HARD]   = *(__IO uint16_t*)HI_SCORE_HARD_ADDR;
+
+  if (g_hi_scores[DIFFICULTY_EASY] == 0xFFFF) g_hi_scores[DIFFICULTY_EASY] = 0;
+  if (g_hi_scores[DIFFICULTY_NORMAL] == 0xFFFF) g_hi_scores[DIFFICULTY_NORMAL] = 0;
+  if (g_hi_scores[DIFFICULTY_HARD] == 0xFFFF) g_hi_scores[DIFFICULTY_HARD] = 0;
   lastGameTick = 0;
 
   g_player_last = g_player;
@@ -455,7 +477,7 @@ int main(void)
   g_night_last = g_night;
 
   ssd1306_Fill(Black);
-  render_game();
+  //render_game();
   ssd1306_UpdateScreen();
   /* USER CODE END 2 */
 
@@ -466,40 +488,83 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  if (HAL_GetTick() - lastGameTick > (1000 / g_target_fps))
-	      {
-	          lastGameTick = HAL_GetTick();
+	  if (g_jump_flag == 1) {
+	            g_jump_flag = 0;
+	            if (g_gameState == GAME_STATE_PLAYING) {
+	                handle_jump_press();
+	            } else if (g_gameState == GAME_STATE_MENU) {
+	                g_menu_cursor = (g_menu_cursor + 1) % 3;
+	                g_menu_dirty = true;
+	            }
+	        }
 
-	          if (g_gameState == GAME_STATE_PLAYING) {
-	          	              update_game_logic();
-	          	              render_game();
+	        if (g_reset_flag == 1) {
+	            g_reset_flag = 0;
+	            if (g_gameState == GAME_STATE_OVER) {
+	                g_gameState = GAME_STATE_MENU;
+	                g_menu_dirty = true;
+	            } else if (g_gameState == GAME_STATE_MENU) {
+	                g_menu_cursor--;
+	                if (g_menu_cursor < 0) {
+	                    g_menu_cursor = 2;
+	                }
+	                g_menu_dirty = true;
+	            }
+	        }
+	        if (g_quit_flag == 1) {
+	        	g_quit_flag = 0;
+	        	if (g_gameState == GAME_STATE_PLAYING) {
+	        	g_gameState = GAME_STATE_MENU;
+	        	g_menu_dirty = true;
+	        	if (g_score > g_hi_scores[g_difficulty]) {
+	        		g_hi_scores[g_difficulty] = g_score;
+	        	    Save_Hi_Score();
+	        	}
+	       }else if (g_gameState == GAME_STATE_MENU) {
+	                g_difficulty = (Difficulty_t)g_menu_cursor;
+	                handle_reset_press();
+	            }
+	        }
+	        switch (g_gameState) {
+	            case GAME_STATE_SPLASH:
+	                ssd1306_Fill(Black);
+	                ssd1306_SetCursor(30, 25);
+	                ssd1306_WriteString("T-REX GAME", Font_7x10, White);
+	                ssd1306_UpdateScreen();
+	                HAL_Delay(2000);
+	                g_gameState = GAME_STATE_MENU;
+	                g_menu_dirty = true;
+	                break;
 
-	          	              ssd1306_UpdateScreen();
+	            case GAME_STATE_MENU:
+	                if (g_menu_dirty) {
+	                    Render_Menu();
+	                    g_menu_dirty = false;
+	                }
+	                break;
 
-	          	              g_player_last = g_player;
-	          	              g_cactus1_last = g_cactus1;
-	          	              g_cactus2_last = g_cactus2;
-	          	              g_heart_last = g_heart;
+	            case GAME_STATE_PLAYING:
+	                if (HAL_GetTick() - lastGameTick > (1000 / g_target_fps)) {
+	                    lastGameTick = HAL_GetTick();
 
-	          	          } else if (g_gameState == GAME_STATE_OVER) {
-	              render_game();
-	          }
+	                    update_game_logic();
+	                    render_game();
+	                    ssd1306_UpdateScreen();
 
-	          g_cycle_count++;
-	      }
-	      if (g_jump_flag == 1) {
-	          g_jump_flag = 0;
-	          if (g_gameState == GAME_STATE_PLAYING) {
-	              handle_jump_press();
-	          }
-	      }
+	                    g_player_last = g_player;
+	                    g_cactus1_last = g_cactus1;
+	                    g_cactus2_last = g_cactus2;
+	                    g_heart_last = g_heart;
+	                }
+	                break;
 
-	      if (g_reset_flag == 1) {
-	          g_reset_flag = 0;
-	          if (g_gameState == GAME_STATE_OVER) {
-	              handle_reset_press();
-	          }
-	      }
+	            case GAME_STATE_OVER:
+	                if (g_game_over) {
+	                    render_game();
+	                    g_game_over = false;
+	                }
+	                break;
+	        }
   }
   /* USER CODE END 3 */
 }
@@ -579,8 +644,8 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : PB3 */
-  GPIO_InitStruct.Pin = GPIO_PIN_3;
+  /*Configure GPIO pins : PB3 PB4 */
+  GPIO_InitStruct.Pin = GPIO_PIN_3|GPIO_PIN_4;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
@@ -588,6 +653,9 @@ static void MX_GPIO_Init(void)
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI3_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI3_IRQn);
+
+  HAL_NVIC_SetPriority(EXTI4_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
 
   HAL_NVIC_SetPriority(EXTI15_10_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
@@ -676,6 +744,14 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
             g_reset_flag = 1;
         }
     }
+    if (GPIO_Pin == GPIO_PIN_4) // << THÊM KHỐI IF NÀY
+    {
+        if (HAL_GetTick() - g_last_quit_tick > DEBOUNCE_TIME)
+        {
+            g_last_quit_tick = HAL_GetTick();
+            g_quit_flag = 1; // Đặt cờ cho nút PB4
+        }
+    }
 }
 
 void handle_jump_press() {
@@ -686,6 +762,26 @@ void handle_jump_press() {
 }
 
 void handle_reset_press() {
+    switch (g_difficulty) {
+        case DIFFICULTY_EASY:
+            g_target_fps = 20;
+            g_scroll_speed = 8;
+            g_lives = 3;
+            g_heart_spawn_score = 100;
+            break;
+        case DIFFICULTY_NORMAL:
+            g_target_fps = TARGET_FPS_START;
+            g_scroll_speed = 11;
+            g_lives = 2;
+            g_heart_spawn_score = 300;
+            break;
+        case DIFFICULTY_HARD:
+            g_target_fps = 35;
+            g_scroll_speed = 14;
+            g_lives = 1;
+            g_heart_spawn_score = 500;
+            break;
+    }
     g_gameState = GAME_STATE_PLAYING;
     g_player.x = 10;
     g_player.y = 30;
@@ -693,39 +789,15 @@ void handle_reset_press() {
     g_jump_velocity = 0;
 
     const int fixed_gap = (int)(3.5f * 32);
-    if (rand() % 2) {
-        g_cactus1.x = 128;
-        g_cactus2.x = g_cactus1.x + g_cactus1.w + fixed_gap;
-    } else {
-        g_cactus2.x = 128;
-        g_cactus1.x = g_cactus2.x + g_cactus2.w + fixed_gap;
-    }
-    if (rand() % 2) {
-        g_cactus1.bitmap = cacti_big_big_bitmap;
-        g_cactus1.mask = cacti_big_big_mask;
-    } else {
-        g_cactus1.bitmap = cacti_small_big_bitmap;
-        g_cactus1.mask = cacti_small_big_mask;
-    }
-    if (rand() % 2) {
-        g_cactus2.bitmap = cacti_big_big_bitmap;
-        g_cactus2.mask = cacti_big_big_mask;
-    } else {
-        g_cactus2.bitmap = cacti_small_big_bitmap;
-        g_cactus2.mask = cacti_small_big_mask;
-    }
     g_heart.x = 255;
     g_score = 0;
-    g_lives = LIVES_START;
     g_game_over = false;
-    g_target_fps = TARGET_FPS_START;
     g_night = false;
     ssd1306_WriteCommand(0xA6);
     cactus1_collided = false;
     cactus2_collided = false;
+
     ssd1306_Fill(Black);
-    render_game();
-    ssd1306_UpdateScreen();
 
     g_player_last = g_player;
     g_cactus1_last = g_cactus1;
@@ -754,8 +826,8 @@ void update_game_logic(void) {
         case 1: g_player.bitmap = trex_up_2s_bitmap; g_player.mask = trex_up_2s_mask; break;
         case 2: g_player.bitmap = trex_up_3s_bitmap; g_player.mask = trex_up_3s_mask; break;
     }
-    g_cactus1.x -= GROUND_CACTI_SCROLL_SPEED;
-    g_cactus2.x -= GROUND_CACTI_SCROLL_SPEED;
+    g_cactus1.x -= g_scroll_speed;
+    g_cactus2.x -= g_scroll_speed;
 
     if (g_cactus1.x + g_cactus1.w < 0) {
         g_cactus1.x = g_cactus2.x + g_cactus2.w + fixed_gap;
@@ -791,9 +863,8 @@ void update_game_logic(void) {
         }
     }
 
-    // Logic di chuyen va an tim
     if (g_heart.x < 255) {
-        g_heart.x -= GROUND_CACTI_SCROLL_SPEED;
+        g_heart.x -= g_scroll_speed;;
         if (Check_Collision(g_player.x, g_player.y, g_player.w, g_player.h,
                             g_heart.x, g_heart.y, g_heart.w, g_heart.h)) {
             g_lives = (g_lives + 1 > LIVES_MAX) ? LIVES_MAX : g_lives + 1;
@@ -841,17 +912,72 @@ void update_game_logic(void) {
 
     g_score++;
 
-    if ((g_score % 100 == 0) && (g_score > 0) && (g_lives < LIVES_MAX) && (g_heart.x == 255)) {
+    if ((g_score % g_heart_spawn_score == 0) && (g_score > 0) && (g_lives < LIVES_MAX) && (g_heart.x == 255)) {
 
         g_heart.x = SCREEN_WIDTH + 10 + (rand() % 50);
     }
 
-    if (g_score > g_hi_score) g_hi_score = g_score;
+    if (g_score > g_hi_scores[g_difficulty]) g_hi_scores[g_difficulty] = g_score;
 
     if ((g_score - last_fps_increase_score) >= INCREASE_FPS_EVERY_N_SCORE_POINTS && g_target_fps < TARGET_FPS_MAX) {
         g_target_fps++;
         last_fps_increase_score = g_score;
     }
+}
+
+/* USER CODE BEGIN 4 */
+
+void Render_Menu(void) {
+    ssd1306_Fill(Black);
+    ssd1306_SetCursor(35, 5);
+    ssd1306_WriteString("MAIN MENU", Font_7x10, White);
+    int easy_y = 20;
+    int normal_y = 30;
+    int hard_y = 40;
+    int easy_x = 53;
+    int normal_x = 47;
+    int hard_x = 53;
+    int easy_w = 4 * 7;
+    int normal_w = 6 * 7;
+    int hard_w = 4 * 7;
+    int rect_h = 10;
+    ssd1306_SetCursor(easy_x, easy_y);
+    ssd1306_WriteString("EASY", Font_7x10, White);
+    ssd1306_SetCursor(normal_x, normal_y);
+    ssd1306_WriteString("NORMAL", Font_7x10, White);
+    ssd1306_SetCursor(hard_x, hard_y);
+    ssd1306_WriteString("HARD", Font_7x10, White);
+    int rect_x, rect_y, rect_w;
+    if (g_menu_cursor == 0){
+        rect_x = easy_x;
+        rect_y = easy_y;
+        rect_w = easy_w;
+    } else if (g_menu_cursor == 1){
+        rect_x = normal_x;
+        rect_y = normal_y;
+        rect_w = normal_w;
+    } else {
+        rect_x = hard_x;
+        rect_y = hard_y;
+        rect_w = hard_w;
+    }
+    int padding = 3;
+    rect_x -= padding;
+    rect_w += (padding * 2);
+    if (rect_x < 0) rect_x = 0;
+    if (rect_x + rect_w > SSD1306_WIDTH) rect_w = SSD1306_WIDTH - rect_x;
+    ssd1306_FillRectangle_Buffered(rect_x, rect_y, rect_w, rect_h, White);
+    if (g_menu_cursor == 0) {
+        ssd1306_SetCursor(easy_x, easy_y);
+        ssd1306_WriteString("EASY", Font_7x10, Black);
+    } else if (g_menu_cursor == 1) {
+        ssd1306_SetCursor(normal_x, normal_y);
+        ssd1306_WriteString("NORMAL", Font_7x10, Black);
+    } else {
+        ssd1306_SetCursor(hard_x, hard_y);
+        ssd1306_WriteString("HARD", Font_7x10, Black);
+    }
+    ssd1306_UpdateScreen();
 }
 
 void render_game() {
@@ -877,7 +1003,7 @@ void render_game() {
         ssd1306_FillRectangle_Buffered(77, 0, 128 - 77, 30, Black);
         ssd1306_SetCursor(77, 0);
         ssd1306_WriteString("HI", Font_7x10, White);
-        Render_Number(93, 0, g_hi_score);
+        Render_Number(93, 0, g_hi_scores[g_difficulty]);
         ssd1306_SetCursor(77, 11);
         ssd1306_WriteString("SC", Font_7x10, White);
         Render_Number(93, 11, g_score);
@@ -899,7 +1025,7 @@ void render_game() {
         ssd1306_SetCursor(26, 50);
         ssd1306_WriteString("Press RESET", Font_7x10, White);
 
-        Save_Hi_Score(g_hi_score);
+        Save_Hi_Score();
         ssd1306_UpdateScreen();
     }
 }
@@ -953,7 +1079,7 @@ void Render_Ground(int y) {
     if (start_x > 0) {
         ssd1306_Line_Buffered(0, y, start_x - 1, y, White);
     }
-    g_ground_scroll = (g_ground_scroll + GROUND_SPEED) % 128;
+    g_ground_scroll = (g_ground_scroll + g_scroll_speed) % 128;
 }
 
 // Hàm Render_Number
@@ -972,15 +1098,20 @@ void Render_Heart(int x, int y, int lives) {
 }
 
 // Hàm Save_Hi_Score
-void Save_Hi_Score(int score) {
+void Save_Hi_Score(void) {
     HAL_FLASH_Unlock();
     FLASH_EraseInitTypeDef EraseInitStruct;
     EraseInitStruct.TypeErase = FLASH_TYPEERASE_PAGES;
-    EraseInitStruct.PageAddress = 0x0800FC00;
+    EraseInitStruct.PageAddress = HI_SCORE_EASY_ADDR;
     EraseInitStruct.NbPages = 1;
     uint32_t PageError = 0;
-    HAL_FLASHEx_Erase(&EraseInitStruct, &PageError);
-    HAL_FLASH_Program(FLASH_TYPEPROGRAMDATA_HALFWORD, 0x0800FC00, score);
+    if (HAL_FLASHEx_Erase(&EraseInitStruct, &PageError) != HAL_OK)
+    {
+        Error_Handler();
+    }
+    HAL_FLASH_Program(FLASH_TYPEPROGRAMDATA_HALFWORD, HI_SCORE_EASY_ADDR, g_hi_scores[DIFFICULTY_EASY]);
+    HAL_FLASH_Program(FLASH_TYPEPROGRAMDATA_HALFWORD, HI_SCORE_NORMAL_ADDR, g_hi_scores[DIFFICULTY_NORMAL]);
+    HAL_FLASH_Program(FLASH_TYPEPROGRAMDATA_HALFWORD, HI_SCORE_HARD_ADDR, g_hi_scores[DIFFICULTY_HARD]);
     HAL_FLASH_Lock();
 }
 
@@ -1004,7 +1135,7 @@ void Error_Handler(void)
 #ifdef  USE_FULL_ASSERT
 /**
   * @brief  Reports the name of the source file and the source line number
-  * where the assert_param error has occurred.
+  *         where the assert_param error has occurred.
   * @param  file: pointer to the source file name
   * @param  line: assert_param error line source number
   * @retval None

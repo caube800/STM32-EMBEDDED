@@ -1,14 +1,25 @@
-14:29:06 **** Incremental Build of configuration Debug for project testevent ****
+22:32:53 **** Incremental Build of configuration Debug for project testevent ****
 make -j12 all 
+arm-none-eabi-gcc "../Core/Src/main.c" -mcpu=cortex-m3 -std=gnu11 -g3 -DDEBUG -DUSE_HAL_DRIVER -DSTM32L151xB -c -I../Core/Inc -I../Drivers/STM32L1xx_HAL_Driver/Inc -I../Drivers/STM32L1xx_HAL_Driver/Inc/Legacy -I../Drivers/CMSIS/Device/ST/STM32L1xx/Include -I../Drivers/CMSIS/Include -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -fcyclomatic-complexity -MMD -MP -MF"Core/Src/main.d" -MT"Core/Src/main.o" --specs=nano.specs -mfloat-abi=soft -mthumb -o "Core/Src/main.o"
+../Core/Src/main.c: In function 'handle_reset_press':
+../Core/Src/main.c:791:15: warning: unused variable 'fixed_gap' [-Wunused-variable]
+  791 |     const int fixed_gap = (int)(3.5f * 32);
+      |               ^~~~~~~~~
+arm-none-eabi-gcc -o "testevent.elf" @"objects.list"   -mcpu=cortex-m3 -T"D:\STM32\STM32Cubeide_prj\workspace_1.15.0\testevent\STM32L151C8TX_FLASH.ld" --specs=nosys.specs -Wl,-Map="testevent.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Finished building target: testevent.elf
+ 
 arm-none-eabi-size  testevent.elf 
+arm-none-eabi-objdump -h -S testevent.elf  > "testevent.list"
    text	   data	    bss	    dec	    hex	filename
-  22368	    112	   3184	  25664	   6440	testevent.elf
+  23400	    132	   3188	  26720	   6860	testevent.elf
 Finished building: default.size.stdout
  
-14:29:08 **** Incremental Build of configuration Debug for project testevent ****
+Finished building: testevent.list
+ 
+22:32:56 **** Incremental Build of configuration Debug for project testevent ****
 make -j12 all 
 arm-none-eabi-size  testevent.elf 
    text	   data	    bss	    dec	    hex	filename
-  22368	    112	   3184	  25664	   6440	testevent.elf
+  23400	    132	   3188	  26720	   6860	testevent.elf
 Finished building: default.size.stdout
  
