@@ -78,6 +78,7 @@ typedef struct {
 #define CACTUS_RESPAWN_MAX  (SCREEN_WIDTH + 80)
 #define SAFE_DISTANCE_MIN   60
 #define SAFE_DISTANCE_MAX   120
+#define BUZZER_DURATION 100
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -130,6 +131,9 @@ Entity_t g_cactus1_last;
 Entity_t g_cactus2_last;
 Entity_t g_heart_last;
 bool g_night_last = false;
+
+bool g_buzzer_active = false;
+uint32_t g_buzzer_start_tick = 0;
 
 const uint8_t trex_up_1s_bitmap[] = {
     0x00, 0x00, 0x00, 0x00,
@@ -377,6 +381,7 @@ void ssd1306_Line_Buffered(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, SSD13
 void ssd1306_DrawBitmap_Buffered(int16_t x, int16_t y, const uint8_t *bitmap, uint8_t w, uint8_t h, SSD1306_COLOR color);
 void ssd1306_FillRectangle_Buffered(int16_t x, int16_t y, uint8_t w, uint8_t h, SSD1306_COLOR color);
 void Render_Menu(void);
+void Handle_Buzzer_NonBlocking(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -414,6 +419,7 @@ int main(void)
   MX_GPIO_Init();
   /* USER CODE BEGIN 2 */
   ssd1306_Init();
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
   // Khởi tạo trạng thái và đối tượng
   g_gameState = GAME_STATE_SPLASH;
   g_player.x = 10;
@@ -488,6 +494,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+	  Handle_Buzzer_NonBlocking();
 	  if (g_jump_flag == 1) {
 	            g_jump_flag = 0;
 	            if (g_gameState == GAME_STATE_PLAYING) {
@@ -629,13 +636,20 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12|GPIO_PIN_13, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0|GPIO_PIN_12|GPIO_PIN_13, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : PC13 */
   GPIO_InitStruct.Pin = GPIO_PIN_13;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PB0 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /*Configure GPIO pins : PB12 PB13 */
   GPIO_InitStruct.Pin = GPIO_PIN_12|GPIO_PIN_13;
@@ -744,12 +758,21 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
             g_reset_flag = 1;
         }
     }
-    if (GPIO_Pin == GPIO_PIN_4) // << THÊM KHỐI IF NÀY
+    if (GPIO_Pin == GPIO_PIN_4) // << THÊM KH�?I IF NÀY
     {
         if (HAL_GetTick() - g_last_quit_tick > DEBOUNCE_TIME)
         {
             g_last_quit_tick = HAL_GetTick();
-            g_quit_flag = 1; // Đặt cờ cho nút PB4
+            g_quit_flag = 1; // �?ặt c�? cho nút PB4
+        }
+    }
+}
+
+void Handle_Buzzer_NonBlocking(void) {
+    if (g_buzzer_active) {
+        if (HAL_GetTick() - g_buzzer_start_tick >= BUZZER_DURATION) {
+            HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
+            g_buzzer_active = false;
         }
     }
 }
@@ -789,6 +812,16 @@ void handle_reset_press() {
     g_jump_velocity = 0;
 
     const int fixed_gap = (int)(3.5f * 32);
+    int start_delay_pixels = (g_scroll_speed * g_target_fps) / 5;
+
+    if (rand() % 2) {
+       g_cactus1.x = 128 + start_delay_pixels;
+       g_cactus2.x = g_cactus1.x + g_cactus1.w + fixed_gap;
+    } else {
+       g_cactus2.x = 128 + start_delay_pixels;
+       g_cactus1.x = g_cactus2.x + g_cactus2.w + fixed_gap;
+        }
+
     g_heart.x = 255;
     g_score = 0;
     g_game_over = false;
@@ -796,9 +829,7 @@ void handle_reset_press() {
     ssd1306_WriteCommand(0xA6);
     cactus1_collided = false;
     cactus2_collided = false;
-
     ssd1306_Fill(Black);
-
     g_player_last = g_player;
     g_cactus1_last = g_cactus1;
     g_cactus2_last = g_cactus2;
@@ -892,22 +923,44 @@ void update_game_logic(void) {
     bool hit_cactus2 = Check_Collision(head_x, head_y, head_w, head_h, c2_x, c2_y, c2_w, c2_h);
 
     if (hit_cactus1 && !cactus1_collided) {
-        g_lives--;
-        cactus1_collided = true;
-    } else if (!hit_cactus1 && (g_cactus1.x + g_cactus1.w) < g_player.x) {
-        cactus1_collided = false;
+       g_lives--;
+       cactus1_collided = true;
+       if (!g_buzzer_active) {
+    	   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
+    	   g_buzzer_active = true;
+    	   g_buzzer_start_tick = HAL_GetTick();
+       }else if (!hit_cactus1 && (g_cactus1.x + g_cactus1.w) < g_player.x) {
+    	   cactus1_collided = false;
+       }
     }
-
     if (hit_cactus2 && !cactus2_collided) {
-        g_lives--;
-        cactus2_collided = true;
-    } else if (!hit_cactus2 && (g_cactus2.x + g_cactus2.w) < g_player.x) {
-        cactus2_collided = false;
+      g_lives--;
+      cactus2_collided = true;
+      if (!g_buzzer_active) {
+    	HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
+      	  g_buzzer_active = true;
+      	  g_buzzer_start_tick = HAL_GetTick();
+      } else if (!hit_cactus2 && (g_cactus2.x + g_cactus2.w) < g_player.x) {
+    	  cactus2_collided = false;
+      }
     }
-
     if (g_lives <= 0) {
-        g_game_over = true;
-        g_gameState = GAME_STATE_OVER;
+      g_game_over = true;
+      g_gameState = GAME_STATE_OVER;
+
+      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
+      HAL_Delay(100);
+      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
+      HAL_Delay(100);
+
+      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
+      HAL_Delay(100);
+      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
+      HAL_Delay(100);
+
+      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET);
+      HAL_Delay(1000);
+      HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET);
     }
 
     g_score++;

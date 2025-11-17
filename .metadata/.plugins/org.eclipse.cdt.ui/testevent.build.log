@@ -1,10 +1,10 @@
-22:32:56 **** Incremental Build of configuration Debug for project testevent ****
+10:02:05 **** Incremental Build of configuration Debug for project testevent ****
 make -j12 all 
 arm-none-eabi-size  testevent.elf 
    text	   data	    bss	    dec	    hex	filename
-  23400	    132	   3188	  26720	   6860	testevent.elf
+  23856	    132	   3196	  27184	   6a30	testevent.elf
 Finished building: default.size.stdout
  
 
-22:32:56 Build Finished. 0 errors, 0 warnings. (took 290ms)
+10:02:06 Build Finished. 0 errors, 0 warnings. (took 294ms)
 
